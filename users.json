@@ -1,0 +1,10 @@
+{
+    "users": [
+        {
+            "id": 1,
+            "username": "jocarsa",
+            "password_hash": "$2y$10$bUfUtdrXpR9ccKvU\/NzuR.CGNejW724XSNWoEwrbfrzXQWcbwoMla"
+        }
+    ],
+    "last_user_id": 1
+}
