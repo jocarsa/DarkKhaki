@@ -179,61 +179,6 @@
         cursor: pointer;
         padding: 0;
     }
-
-    /* Login area styling */
-    #login-area {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: #fff;
-        padding: 20px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.3);
-        display: none;
-    }
-
-    #login-area h2 {
-        margin-top: 0;
-    }
-
-    #login-area input {
-        display: block;
-        margin-bottom: 10px;
-        width: 200px;
-        padding: 5px;
-    }
-
-    #login-area button {
-        margin-right: 5px;
-        background: var(--theme-color);
-        border: none;
-        padding: 5px 10px;
-        border-radius: 3px;
-        cursor: pointer;
-        font-size: 14px;
-        margin-bottom: 5px;
-    }
-
-    #login-area button:hover {
-        background: #a9a166;
-    }
-
-    #logout-btn {
-        background: var(--theme-color);
-        border: none;
-        padding: 5px 10px;
-        border-radius: 3px;
-        cursor: pointer;
-        font-size: 14px;
-        display: none; /* shown after login */
-        margin-left: auto;
-    }
-
-    #logout-btn:hover {
-        background: #a9a166;
-    }
-
 </style>
 </head>
 <body>
@@ -244,21 +189,13 @@
     <button id="add-panel-btn">Añadir Panel</button>
     <button id="add-tag-btn">Añadir Etiqueta</button>
     <input type="color" id="tag-color-picker" value="#c0c0c0">
-    <button id="logout-btn">Cerrar Sesión</button>
+    <span style="color:#000;">
+        
+    </span>
 </div>
 
 <div id="canvas-container">
     <div id="pan-zoom-area"></div>
-</div>
-
-<!-- Login area -->
-<div id="login-area">
-    <h2>Iniciar Sesión / Registrarse</h2>
-    <input type="text" id="username" placeholder="Usuario">
-    <input type="password" id="password" placeholder="Contraseña">
-    <button id="login-btn">Iniciar Sesión</button>
-    <button id="register-btn">Registrarse</button>
-    <p id="login-message" style="color:red;"></p>
 </div>
 
 <script>
@@ -267,12 +204,6 @@
     const addPanelBtn = document.getElementById('add-panel-btn');
     const tagColorPicker = document.getElementById('tag-color-picker');
     const panelSelect = document.getElementById('panel-select');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    const loginArea = document.getElementById('login-area');
-    const loginBtn = document.getElementById('login-btn');
-    const registerBtn = document.getElementById('register-btn');
-    const loginMessage = document.getElementById('login-message');
 
     let panels = {};  
     let currentPanelId = null;
@@ -282,11 +213,6 @@
     let originY = 0;
     let isPanning = false;
     let startX, startY;
-
-    // Check if user is authenticated by trying to load panels from server
-    window.addEventListener('load', () => {
-        loadPanelsFromServer();
-    });
 
     // ---- Panel Management ----
     function loadPanelsFromLocalStorage() {
@@ -381,23 +307,7 @@
             };
         });
 
-        // Save to local storage
         savePanelsToLocalStorage();
-
-        // Also try to save to server (if logged in)
-        fetch('savePanels.php', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({panels})
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status !== 'success') {
-                console.warn('Error saving to server:', data.message || 'Unknown');
-            }
-        })
-        .catch(err => console.warn('Error saving to server:', err));
     }
 
     // ---- Pan & Zoom Logic ----
@@ -662,119 +572,10 @@
         }
     });
 
-    // ---- Authentication / Server Integration ----
-    function loadPanelsFromServer() {
-        // Try loading from server
-        fetch('loadPanels.php', {
-            method: 'GET',
-            credentials: 'include'
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // User is logged in
-                logoutBtn.style.display = 'block';
-                loginArea.style.display = 'none';
-
-                panels = data.panels;
-                if (Object.keys(panels).length === 0) {
-                    currentPanelId = createPanel('Panel por defecto');
-                } else {
-                    currentPanelId = Object.keys(panels)[0];
-                }
-                updatePanelSelect();
-                loadPanel(currentPanelId);
-            } else {
-                // Not logged in, fallback to local storage
-                logoutBtn.style.display = 'none';
-                loginArea.style.display = 'block';
-                loadPanelsFromLocalStorage();
-                updatePanelSelect();
-                loadPanel(currentPanelId);
-            }
-        })
-        .catch(() => {
-            // Server not reachable, fallback to local storage
-            logoutBtn.style.display = 'none';
-            loginArea.style.display = 'block';
-            loadPanelsFromLocalStorage();
-            updatePanelSelect();
-            loadPanel(currentPanelId);
-        });
-    }
-
-    loginBtn.addEventListener('click', () => {
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-
-        fetch('login.php', {
-            method: 'POST',
-            headers: {'Content-Type':'application/x-www-form-urlencoded'},
-            credentials: 'include',
-            body: new URLSearchParams({username, password})
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                loginMessage.textContent = '';
-                loginArea.style.display = 'none';
-                logoutBtn.style.display = 'block';
-                loadPanelsFromServer();
-            } else {
-                loginMessage.textContent = 'Credenciales inválidas';
-            }
-        })
-        .catch(err => {
-            console.warn('Error logging in:', err);
-        });
-    });
-
-    registerBtn.addEventListener('click', () => {
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-
-        fetch('register.php', {
-            method: 'POST',
-            headers: {'Content-Type':'application/x-www-form-urlencoded'},
-            body: new URLSearchParams({username, password})
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                loginMessage.style.color = 'green';
-                loginMessage.textContent = 'Usuario registrado con éxito. Ahora inicie sesión.';
-            } else {
-                loginMessage.style.color = 'red';
-                loginMessage.textContent = data.message || 'Error en el registro';
-            }
-        })
-        .catch(err => {
-            console.warn('Error registering:', err);
-        });
-    });
-
-    logoutBtn.addEventListener('click', () => {
-        // Call logout.php to destroy session
-        fetch('logout.php', {
-            method: 'GET',
-            credentials: 'include'
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                logoutBtn.style.display = 'none';
-                loginArea.style.display = 'block';
-                // Fallback to local storage again
-                loadPanelsFromLocalStorage();
-                updatePanelSelect();
-                loadPanel(currentPanelId);
-            }
-        })
-        .catch(err => {
-            console.warn('Error logging out:', err);
-        });
-    });
+    loadPanelsFromLocalStorage();
+    updatePanelSelect();
+    loadPanel(currentPanelId);
 </script>
+
 </body>
 </html>
-
