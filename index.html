@@ -29,28 +29,33 @@
         z-index: 1000;
     }
 
-    #toolbar button {
+    #toolbar button, #toolbar select, #toolbar input[type="color"] {
         margin-right: 10px;
         background: #444;
         border: none;
         color: #fff;
         padding: 5px 10px;
         cursor: pointer;
+        font-size: 14px;
     }
 
-    #toolbar button:hover {
+    #toolbar select {
+        background: #444;
+        color: #fff;
+    }
+
+    #toolbar button:hover, #toolbar select:hover {
         background: #555;
     }
 
     #toolbar input[type="color"] {
-        margin-right: 10px;
-        border: none;
-        background: none;
-        cursor: pointer;
         width: 30px;
         height: 30px;
         padding: 0;
         outline: none;
+        border: none;
+        background: none;
+        cursor: pointer;
     }
 
     #canvas-container {
@@ -108,13 +113,14 @@
     .color-control {
         position: absolute;
         top: 5px;
-        right: 5px;
+        right: 30px;
         background: rgba(255,255,255,0.7);
         border: none;
         cursor: pointer;
         font-size: 12px;
         padding: 2px 5px;
         border-radius: 3px;
+        color: #000;
     }
 
     .color-control:hover {
@@ -124,21 +130,25 @@
     .tag-color-picker {
         position: absolute;
         top: 25px;
-        right: 5px;
+        right: 30px;
         display: none;
         width: 30px;
         height: 30px;
         border: none;
         border-radius: 3px;
+        cursor: pointer;
+        padding: 0;
     }
 </style>
 </head>
 <body>
 
 <div id="toolbar">
+    <select id="panel-select"></select>
+    <button id="add-panel-btn">Add Panel</button>
     <button id="add-tag-btn">Add Idea Tag</button>
     <input type="color" id="tag-color-picker" value="#c0c0c0">
-    <span>Use mouse wheel or pinch-to-zoom. Click and drag background to pan. Drag corner to resize tags. Click Color on a tag to change its color.</span>
+    <span style="color:#aaa;">Use mouse wheel or pinch-to-zoom. Drag background to pan. Drag corner to resize tags. Click Color on a tag to change its color.</span>
 </div>
 
 <div id="canvas-container">
@@ -148,7 +158,12 @@
 <script>
     const panZoomArea = document.getElementById('pan-zoom-area');
     const addTagBtn = document.getElementById('add-tag-btn');
+    const addPanelBtn = document.getElementById('add-panel-btn');
     const tagColorPicker = document.getElementById('tag-color-picker');
+    const panelSelect = document.getElementById('panel-select');
+
+    let panels = {};  // { panelId: { name, originX, originY, scale, tags: [{text, left, top, width, height, color}] } }
+    let currentPanelId = null;
 
     let scale = 1;
     let originX = 0;
@@ -156,7 +171,115 @@
     let isPanning = false;
     let startX, startY;
 
-    // Pan & Zoom Logic
+    // ---- Panel Management ----
+
+    // Load panels from localStorage
+    function loadPanelsFromLocalStorage() {
+        const savedData = localStorage.getItem('darkKhakiPanels');
+        if (savedData) {
+            panels = JSON.parse(savedData);
+        } else {
+            panels = {};
+        }
+
+        // Try to restore last panel
+        const lastPanelId = localStorage.getItem('darkKhakiLastPanelId');
+        if (lastPanelId && panels[lastPanelId]) {
+            currentPanelId = lastPanelId;
+        } else {
+            // If no panels exist, create a default one
+            if (Object.keys(panels).length === 0) {
+                currentPanelId = createPanel('Default Panel');
+            } else {
+                // Just pick the first panel
+                currentPanelId = Object.keys(panels)[0];
+            }
+        }
+    }
+
+    // Save panels to localStorage
+    function savePanelsToLocalStorage() {
+        localStorage.setItem('darkKhakiPanels', JSON.stringify(panels));
+        localStorage.setItem('darkKhakiLastPanelId', currentPanelId);
+    }
+
+    // Create a new panel
+    function createPanel(name) {
+        const panelId = 'panel_' + Date.now();
+        panels[panelId] = {
+            name: name,
+            originX: 0,
+            originY: 0,
+            scale: 1,
+            tags: []
+        };
+        savePanelsToLocalStorage();
+        return panelId;
+    }
+
+    // Update panel select dropdown
+    function updatePanelSelect() {
+        panelSelect.innerHTML = '';
+        for (const pid in panels) {
+            const opt = document.createElement('option');
+            opt.value = pid;
+            opt.textContent = panels[pid].name;
+            if (pid === currentPanelId) {
+                opt.selected = true;
+            }
+            panelSelect.appendChild(opt);
+        }
+    }
+
+    // Load a panel into the UI
+    function loadPanel(panelId) {
+        currentPanelId = panelId;
+        const panel = panels[panelId];
+        originX = panel.originX;
+        originY = panel.originY;
+        scale = panel.scale;
+        applyTransform();
+        // Clear existing tags
+        panZoomArea.innerHTML = '';
+        // Add panel's tags
+        panel.tags.forEach(tagData => {
+            const tag = createIdeaTag(
+                tagData.text,
+                tagData.color,
+                tagData.left,
+                tagData.top,
+                tagData.width,
+                tagData.height
+            );
+            panZoomArea.appendChild(tag);
+        });
+    }
+
+    // Save current panel state from UI
+    function saveCurrentPanel() {
+        if (!currentPanelId) return;
+        const panel = panels[currentPanelId];
+        panel.originX = originX;
+        panel.originY = originY;
+        panel.scale = scale;
+
+        // Extract tags from DOM
+        const tagElements = panZoomArea.querySelectorAll('.idea-tag');
+        panel.tags = Array.from(tagElements).map(tag => {
+            return {
+                text: tag.textContent,
+                left: parseFloat(tag.style.left),
+                top: parseFloat(tag.style.top),
+                width: parseFloat(tag.style.width),
+                height: parseFloat(tag.style.height),
+                color: tag.style.backgroundColor
+            };
+        });
+
+        savePanelsToLocalStorage();
+    }
+
+    // ---- Pan & Zoom Logic ----
     document.getElementById('canvas-container').addEventListener('mousedown', (e) => {
         if (e.target === panZoomArea || e.target.id === 'canvas-container') {
             isPanning = true;
@@ -169,6 +292,7 @@
     document.addEventListener('mouseup', () => {
         isPanning = false;
         panZoomArea.style.cursor = 'grab';
+        saveCurrentPanel();
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -197,30 +321,31 @@
 
         scale *= factor;
         applyTransform();
+        saveCurrentPanel();
     });
 
     function applyTransform() {
         panZoomArea.style.transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
     }
 
-    // Add a new Idea Tag
+    // ---- Idea Tag Management ----
     addTagBtn.addEventListener('click', () => {
-        const tag = createIdeaTag('New Idea', tagColorPicker.value);
+        if (!currentPanelId) return;
+        const tag = createIdeaTag('New Idea', tagColorPicker.value, originX + 50, originY + 50, 150, 80);
         panZoomArea.appendChild(tag);
-        // Position it at some offset within the current view
-        const offsetX = 50;
-        const offsetY = 50;
-        tag.style.left = `${originX + offsetX}px`;
-        tag.style.top = `${originY + offsetY}px`;
+        saveCurrentPanel();
     });
 
-    // Create Idea Tag Element
-    function createIdeaTag(text, bgColor) {
+    function createIdeaTag(text, bgColor, left, top, width=150, height=80) {
         const tag = document.createElement('div');
         tag.className = 'idea-tag';
         tag.contentEditable = "true";
         tag.textContent = text;
         tag.style.backgroundColor = bgColor;
+        tag.style.left = left + 'px';
+        tag.style.top = top + 'px';
+        tag.style.width = width + 'px';
+        tag.style.height = height + 'px';
 
         // Draggable logic
         let isDragging = false;
@@ -238,6 +363,9 @@
         });
 
         document.addEventListener('mouseup', () => {
+            if (isDragging || isResizing) {
+                saveCurrentPanel();
+            }
             isDragging = false;
             isResizing = false;
         });
@@ -285,8 +413,8 @@
             isResizing = true;
             resizeStartX = e.clientX;
             resizeStartY = e.clientY;
-            resizeStartWidth = parseFloat(getComputedStyle(tag, null).getPropertyValue('width').replace('px', ''));
-            resizeStartHeight = parseFloat(getComputedStyle(tag, null).getPropertyValue('height').replace('px', ''));
+            resizeStartWidth = parseFloat(getComputedStyle(tag, null).getPropertyValue('width'));
+            resizeStartHeight = parseFloat(getComputedStyle(tag, null).getPropertyValue('height'));
         });
 
         // Color change logic
@@ -310,10 +438,35 @@
 
         colorInput.addEventListener('input', () => {
             tag.style.backgroundColor = colorInput.value;
+            saveCurrentPanel();
         });
 
         return tag;
     }
+
+    // ---- Handle Panels ----
+    addPanelBtn.addEventListener('click', () => {
+        const panelName = prompt('Enter panel name:','New Panel');
+        if (panelName) {
+            const pid = createPanel(panelName);
+            updatePanelSelect();
+            loadPanel(pid);
+        }
+    });
+
+    panelSelect.addEventListener('change', () => {
+        const pid = panelSelect.value;
+        if (panels[pid]) {
+            saveCurrentPanel(); // save current before switching
+            loadPanel(pid);
+            updatePanelSelect();
+        }
+    });
+
+    // Initial load
+    loadPanelsFromLocalStorage();
+    updatePanelSelect();
+    loadPanel(currentPanelId);
 
 </script>
 
