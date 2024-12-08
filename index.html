@@ -189,9 +189,9 @@
     <button id="add-panel-btn">Añadir Panel</button>
     <button id="add-tag-btn">Añadir Etiqueta</button>
     <input type="color" id="tag-color-picker" value="#c0c0c0">
-    <span style="color:#000;">
-        
-    </span>
+    <button id="download-panel-btn">Descargar Panel</button>
+    <input type="file" id="upload-panel-btn" style="display: none;" accept=".panel" />
+    <button id="load-panel-btn">Cargar Panel</button>
 </div>
 
 <div id="canvas-container">
@@ -575,6 +575,61 @@
     loadPanelsFromLocalStorage();
     updatePanelSelect();
     loadPanel(currentPanelId);
+    
+    const downloadPanelBtn = document.getElementById('download-panel-btn');
+const uploadPanelBtn = document.getElementById('upload-panel-btn');
+const loadPanelBtn = document.getElementById('load-panel-btn');
+
+// Function to download the current panel as a .panel file
+downloadPanelBtn.addEventListener('click', () => {
+    if (!currentPanelId || !panels[currentPanelId]) {
+        alert('No hay ningún panel seleccionado para descargar.');
+        return;
+    }
+
+    const panelData = panels[currentPanelId];
+    const blob = new Blob([JSON.stringify(panelData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${panelData.name}.panel`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+});
+
+// Function to trigger file upload input
+loadPanelBtn.addEventListener('click', () => {
+    uploadPanelBtn.click();
+});
+
+// Function to handle uploaded .panel files
+uploadPanelBtn.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const importedPanel = JSON.parse(e.target.result);
+
+            if (!importedPanel.name || !importedPanel.tags) {
+                throw new Error('El archivo no es un panel válido.');
+            }
+
+            const newPanelId = createPanel(importedPanel.name);
+            panels[newPanelId] = { ...importedPanel, scale: 1, originX: 0, originY: 0 }; // Reset zoom and position
+            updatePanelSelect();
+            loadPanel(newPanelId);
+            alert('Panel cargado exitosamente.');
+        } catch (error) {
+            alert('Error al cargar el archivo del panel: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+});
+
 </script>
 
 </body>
