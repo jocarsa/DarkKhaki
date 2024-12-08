@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DarkKhaki</title>
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+        height: 100%;
+        overflow: hidden;
+        background: #f5f5f5;
+    }
+
+    /* Toolbar */
+    #toolbar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50px;
+        background: #333;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        z-index: 1000;
+    }
+
+    #toolbar button {
+        margin-right: 10px;
+        background: #444;
+        border: none;
+        color: #fff;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+
+    #toolbar button:hover {
+        background: #555;
+    }
+
+    #toolbar input[type="color"] {
+        margin-right: 10px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        outline: none;
+    }
+
+    #canvas-container {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        position: relative;
+        top: 50px; /* Make room for the toolbar */
+    }
+
+    /* The transformable "canvas" */
+    #pan-zoom-area {
+        position: absolute;
+        transform-origin: 0 0;
+        cursor: grab;
+        user-select: none;
+    }
+
+    .idea-tag {
+        position: absolute;
+        width: 150px;
+        height: 80px;
+        background: #eee;
+        border-radius: 5px;
+        padding: 5px;
+        box-sizing: border-box;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        cursor: move;
+        font-size: 14px;
+        word-wrap: break-word;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        resize: none;
+    }
+
+    .idea-tag:focus {
+        outline: none;
+    }
+
+    /* Resize handle */
+    .resize-handle {
+        width: 15px;
+        height: 15px;
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        cursor: nwse-resize;
+        background: rgba(0,0,0,0.2);
+        border-top-left-radius: 3px;
+    }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+    <button id="add-tag-btn">Add Idea Tag</button>
+    <input type="color" id="tag-color-picker" value="#c0c0c0">
+    <span>Use mouse wheel or pinch-to-zoom. Click and drag background to pan. Drag corner to resize tags.</span>
+</div>
+
+<div id="canvas-container">
+    <div id="pan-zoom-area"></div>
+</div>
+
+<script>
+    const panZoomArea = document.getElementById('pan-zoom-area');
+    const addTagBtn = document.getElementById('add-tag-btn');
+    const tagColorPicker = document.getElementById('tag-color-picker');
+
+    let scale = 1;
+    let originX = 0;
+    let originY = 0;
+    let isPanning = false;
+    let startX, startY;
+
+    // Pan & Zoom Logic
+    document.getElementById('canvas-container').addEventListener('mousedown', (e) => {
+        if (e.target === panZoomArea || e.target.id === 'canvas-container') {
+            isPanning = true;
+            startX = e.clientX - originX;
+            startY = e.clientY - originY;
+            panZoomArea.style.cursor = 'grabbing';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        isPanning = false;
+        panZoomArea.style.cursor = 'grab';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isPanning) {
+            originX = e.clientX - startX;
+            originY = e.clientY - startY;
+            applyTransform();
+        }
+    });
+
+    // Zoom with mouse wheel
+    document.getElementById('canvas-container').addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomIntensity = 0.1;
+        const direction = e.deltaY > 0 ? -1 : 1;
+        const factor = (1 + zoomIntensity * direction);
+
+        // Compute mouse offset relative to the current origin
+        const rect = panZoomArea.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Adjust origin so zooming is centered at mouse
+        originX = mouseX - (mouseX - originX) * factor;
+        originY = mouseY - (mouseY - originY) * factor;
+
+        scale *= factor;
+        applyTransform();
+    });
+
+    function applyTransform() {
+        panZoomArea.style.transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
+    }
+
+    // Add a new Idea Tag
+    addTagBtn.addEventListener('click', () => {
+        const tag = createIdeaTag('New Idea', tagColorPicker.value);
+        panZoomArea.appendChild(tag);
+        // Position it at some offset within the current view
+        const offsetX = 50;
+        const offsetY = 50;
+        tag.style.left = `${originX + offsetX}px`;
+        tag.style.top = `${originY + offsetY}px`;
+    });
+
+    // Create Idea Tag Element
+    function createIdeaTag(text, bgColor) {
+        const tag = document.createElement('div');
+        tag.className = 'idea-tag';
+        tag.contentEditable = "true";
+        tag.textContent = text;
+        tag.style.backgroundColor = bgColor;
+
+        // Draggable logic
+        let isDragging = false;
+        let dragStartX, dragStartY;
+
+        tag.addEventListener('mousedown', (e) => {
+            // If we're clicking on the resize handle, don't drag
+            if (e.target.classList.contains('resize-handle')) return;
+
+            if (e.target === tag) {
+                isDragging = true;
+                dragStartX = e.clientX - parseFloat(tag.style.left);
+                dragStartY = e.clientY - parseFloat(tag.style.top);
+                e.stopPropagation();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            isResizing = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging && !isResizing) {
+                const newX = e.clientX - dragStartX;
+                const newY = e.clientY - dragStartY;
+                tag.style.left = newX + 'px';
+                tag.style.top = newY + 'px';
+            }
+            if (isResizing) {
+                // Calculate new width/height based on mouse movement
+                const dx = e.clientX - resizeStartX;
+                const dy = e.clientY - resizeStartY;
+
+                // Ensure minimum size
+                const newWidth = Math.max(50, resizeStartWidth + dx);
+                const newHeight = Math.max(30, resizeStartHeight + dy);
+
+                tag.style.width = newWidth + 'px';
+                tag.style.height = newHeight + 'px';
+            }
+        });
+
+        // On double click, select all text for editing
+        tag.addEventListener('dblclick', () => {
+            const range = document.createRange();
+            range.selectNodeContents(tag);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        });
+
+        // Resize handle logic
+        const handle = document.createElement('div');
+        handle.className = 'resize-handle';
+        tag.appendChild(handle);
+
+        let isResizing = false;
+        let resizeStartX, resizeStartY, resizeStartWidth, resizeStartHeight;
+
+        handle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            isResizing = true;
+            resizeStartX = e.clientX;
+            resizeStartY = e.clientY;
+            resizeStartWidth = parseFloat(getComputedStyle(tag, null).getPropertyValue('width').replace('px', ''));
+            resizeStartHeight = parseFloat(getComputedStyle(tag, null).getPropertyValue('height').replace('px', ''));
+        });
+
+        return tag;
+    }
+
+</script>
+
+</body>
+</html>
+
