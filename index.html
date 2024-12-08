@@ -103,6 +103,34 @@
         background: rgba(0,0,0,0.2);
         border-top-left-radius: 3px;
     }
+
+    /* Color Control */
+    .color-control {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: rgba(255,255,255,0.7);
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+
+    .color-control:hover {
+        background: rgba(255,255,255,0.9);
+    }
+
+    .tag-color-picker {
+        position: absolute;
+        top: 25px;
+        right: 5px;
+        display: none;
+        width: 30px;
+        height: 30px;
+        border: none;
+        border-radius: 3px;
+    }
 </style>
 </head>
 <body>
@@ -110,7 +138,7 @@
 <div id="toolbar">
     <button id="add-tag-btn">Add Idea Tag</button>
     <input type="color" id="tag-color-picker" value="#c0c0c0">
-    <span>Use mouse wheel or pinch-to-zoom. Click and drag background to pan. Drag corner to resize tags.</span>
+    <span>Use mouse wheel or pinch-to-zoom. Click and drag background to pan. Drag corner to resize tags. Click Color on a tag to change its color.</span>
 </div>
 
 <div id="canvas-container">
@@ -199,8 +227,7 @@
         let dragStartX, dragStartY;
 
         tag.addEventListener('mousedown', (e) => {
-            // If we're clicking on the resize handle, don't drag
-            if (e.target.classList.contains('resize-handle')) return;
+            if (e.target.classList.contains('resize-handle') || e.target.classList.contains('color-control') || e.target.classList.contains('tag-color-picker')) return;
 
             if (e.target === tag) {
                 isDragging = true;
@@ -260,6 +287,29 @@
             resizeStartY = e.clientY;
             resizeStartWidth = parseFloat(getComputedStyle(tag, null).getPropertyValue('width').replace('px', ''));
             resizeStartHeight = parseFloat(getComputedStyle(tag, null).getPropertyValue('height').replace('px', ''));
+        });
+
+        // Color change logic
+        const colorButton = document.createElement('button');
+        colorButton.className = 'color-control';
+        colorButton.textContent = 'Color';
+        tag.appendChild(colorButton);
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.className = 'tag-color-picker';
+        colorInput.value = bgColor;
+        tag.appendChild(colorInput);
+
+        let colorPickerVisible = false;
+        colorButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            colorPickerVisible = !colorPickerVisible;
+            colorInput.style.display = colorPickerVisible ? 'block' : 'none';
+        });
+
+        colorInput.addEventListener('input', () => {
+            tag.style.backgroundColor = colorInput.value;
         });
 
         return tag;
