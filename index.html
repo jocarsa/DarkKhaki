@@ -86,11 +86,15 @@
         cursor: move;
         font-size: 14px;
         word-wrap: break-word;
-        display: flex;
-        justify-content: center;
-        align-items: center;
         overflow: hidden;
         resize: none;
+    }
+
+    .text-content {
+        width: 100%;
+        height: 100%;
+        outline: none;
+        overflow: auto;
     }
 
     .idea-tag:focus {
@@ -113,7 +117,7 @@
     .color-control {
         position: absolute;
         top: 5px;
-        right: 30px;
+        right: 60px;
         background: rgba(255,255,255,0.7);
         border: none;
         cursor: pointer;
@@ -130,7 +134,7 @@
     .tag-color-picker {
         position: absolute;
         top: 25px;
-        right: 30px;
+        right: 60px;
         display: none;
         width: 30px;
         height: 30px;
@@ -138,6 +142,24 @@
         border-radius: 3px;
         cursor: pointer;
         padding: 0;
+    }
+
+    /* Delete Button */
+    .delete-tag-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: rgba(255,0,0,0.7);
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 2px 5px;
+        border-radius: 3px;
+        color: #fff;
+    }
+
+    .delete-tag-btn:hover {
+        background: rgba(255,0,0,0.9);
     }
 </style>
 </head>
@@ -148,7 +170,10 @@
     <button id="add-panel-btn">Add Panel</button>
     <button id="add-tag-btn">Add Idea Tag</button>
     <input type="color" id="tag-color-picker" value="#c0c0c0">
-    <span style="color:#aaa;">Use mouse wheel or pinch-to-zoom. Drag background to pan. Drag corner to resize tags. Click Color on a tag to change its color.</span>
+    <span style="color:#aaa;">
+        Use mouse wheel or pinch-to-zoom. Drag background to pan. Drag corner to resize tags.
+        Click Color on a tag to change its color. Click X to delete a tag.
+    </span>
 </div>
 
 <div id="canvas-container">
@@ -266,8 +291,9 @@
         // Extract tags from DOM
         const tagElements = panZoomArea.querySelectorAll('.idea-tag');
         panel.tags = Array.from(tagElements).map(tag => {
+            const textEl = tag.querySelector('.text-content');
             return {
-                text: tag.textContent,
+                text: textEl ? textEl.textContent : '',
                 left: parseFloat(tag.style.left),
                 top: parseFloat(tag.style.top),
                 width: parseFloat(tag.style.width),
@@ -339,22 +365,31 @@
     function createIdeaTag(text, bgColor, left, top, width=150, height=80) {
         const tag = document.createElement('div');
         tag.className = 'idea-tag';
-        tag.contentEditable = "true";
-        tag.textContent = text;
         tag.style.backgroundColor = bgColor;
         tag.style.left = left + 'px';
         tag.style.top = top + 'px';
         tag.style.width = width + 'px';
         tag.style.height = height + 'px';
 
+        // Text content element
+        const textEl = document.createElement('div');
+        textEl.className = 'text-content';
+        textEl.contentEditable = "true";
+        textEl.textContent = text;
+        tag.appendChild(textEl);
+
         // Draggable logic
         let isDragging = false;
         let dragStartX, dragStartY;
 
         tag.addEventListener('mousedown', (e) => {
-            if (e.target.classList.contains('resize-handle') || e.target.classList.contains('color-control') || e.target.classList.contains('tag-color-picker')) return;
+            // Ignore clicks on controls
+            if (e.target.classList.contains('resize-handle') 
+             || e.target.classList.contains('color-control') 
+             || e.target.classList.contains('tag-color-picker') 
+             || e.target.classList.contains('delete-tag-btn')) return;
 
-            if (e.target === tag) {
+            if (e.target === tag || e.target === textEl) {
                 isDragging = true;
                 dragStartX = e.clientX - parseFloat(tag.style.left);
                 dragStartY = e.clientY - parseFloat(tag.style.top);
@@ -391,10 +426,10 @@
             }
         });
 
-        // On double click, select all text for editing
-        tag.addEventListener('dblclick', () => {
+        // On double click on text, select it
+        textEl.addEventListener('dblclick', () => {
             const range = document.createRange();
-            range.selectNodeContents(tag);
+            range.selectNodeContents(textEl);
             const sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
@@ -438,6 +473,17 @@
 
         colorInput.addEventListener('input', () => {
             tag.style.backgroundColor = colorInput.value;
+            saveCurrentPanel();
+        });
+
+        // Delete tag button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-tag-btn';
+        deleteBtn.textContent = 'X';
+        tag.appendChild(deleteBtn);
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            tag.remove();
             saveCurrentPanel();
         });
 
