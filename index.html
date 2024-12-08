@@ -1,17 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>DarkKhaki</title>
+<title>DarkKhaki Notas</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Birthstone&family=Monsieur+La+Doulaise&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+    :root {
+        /* Main theme color: DarkKhaki */
+        --theme-color: #BDB76B;
+        --theme-text-color: #333;
+        --toolbar-bg: #8f8a50; /* Slightly darker variant for contrast */
+        --control-bg: rgba(255,255,255,0.7);
+        --control-bg-hover: rgba(255,255,255,0.9);
+        --tag-bg: #eee;
+    }
+
     body, html {
         margin: 0;
         padding: 0;
-        font-family: sans-serif;
+        font-family: Ubuntu,sans-serif;
         height: 100%;
         overflow: hidden;
-        background: #f5f5f5;
+        background: #f9f9f0;
     }
 
     /* Toolbar */
@@ -21,7 +32,7 @@
         left: 0;
         right: 0;
         height: 50px;
-        background: #333;
+        background: var(--toolbar-bg);
         color: #fff;
         display: flex;
         align-items: center;
@@ -29,23 +40,32 @@
         z-index: 1000;
     }
 
+    #toolbar h1 {
+        margin: 0;
+        margin-right: 20px;
+        font-size: 18px;
+        color: #fff;
+        font-weight: normal;
+    }
+
     #toolbar button, #toolbar select, #toolbar input[type="color"] {
         margin-right: 10px;
-        background: #444;
+        background: var(--theme-color);
         border: none;
-        color: #fff;
+        color: #000;
         padding: 5px 10px;
         cursor: pointer;
         font-size: 14px;
+        border-radius: 3px;
     }
 
     #toolbar select {
-        background: #444;
-        color: #fff;
+        background: var(--theme-color);
+        color: #000;
     }
 
     #toolbar button:hover, #toolbar select:hover {
-        background: #555;
+        background: #a9a166;
     }
 
     #toolbar input[type="color"] {
@@ -66,25 +86,30 @@
         top: 50px; /* Make room for the toolbar */
     }
 
-    /* The transformable "canvas" */
+    /* The transformable "canvas" with grid background */
     #pan-zoom-area {
         position: absolute;
         transform-origin: 0 0;
         cursor: grab;
         user-select: none;
+        background-color: #F0E68C; /* Light background related to DarkKhaki */
+        background-image:
+          linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px);
+        background-size: 20px 20px;
     }
 
     .idea-tag {
         position: absolute;
         width: 150px;
         height: 80px;
-        background: #eee;
+        background: var(--tag-bg);
         border-radius: 5px;
         box-sizing: border-box;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         cursor: move;
         word-wrap: break-word;
-        display: flex; /* For centering text */
+        display: flex;
         justify-content: center;
         align-items: center;
     }
@@ -95,7 +120,6 @@
         outline: none;
     }
 
-    /* Resize handle */
     .resize-handle {
         width: 15px;
         height: 15px;
@@ -107,12 +131,11 @@
         border-top-left-radius: 3px;
     }
 
-    /* Tag menu button */
     .tag-menu-btn {
         position: absolute;
         top: 5px;
         left: 5px;
-        background: rgba(255,255,255,0.7);
+        background: var(--control-bg);
         border: none;
         cursor: pointer;
         font-size: 12px;
@@ -122,10 +145,9 @@
     }
 
     .tag-menu-btn:hover {
-        background: rgba(255,255,255,0.9);
+        background: var(--control-bg-hover);
     }
 
-    /* Tag Controls (hidden by default) */
     .tag-controls {
         position: absolute;
         top: 5px;
@@ -135,7 +157,7 @@
     }
 
     .tag-controls > * {
-        background: rgba(255,255,255,0.7);
+        background: var(--control-bg);
         border: none;
         cursor: pointer;
         font-size: 12px;
@@ -145,7 +167,7 @@
     }
 
     .tag-controls > *:hover {
-        background: rgba(255,255,255,0.9);
+        background: var(--control-bg-hover);
     }
 
     .tag-color-picker {
@@ -162,14 +184,13 @@
 <body>
 
 <div id="toolbar">
+    <h1>jocarsa | DarkKhaki</h1>
     <select id="panel-select"></select>
-    <button id="add-panel-btn">Add Panel</button>
-    <button id="add-tag-btn">Add Idea Tag</button>
+    <button id="add-panel-btn">Añadir Panel</button>
+    <button id="add-tag-btn">Añadir Etiqueta</button>
     <input type="color" id="tag-color-picker" value="#c0c0c0">
-    <span style="color:#aaa;">
-        Use mouse wheel or pinch-to-zoom. Drag background to pan. 
-        Drag corner to resize tags. Press the left-top minibutton on a tag to show/hide controls.
-        Formatting: B, I, U, Font Size.
+    <span style="color:#000;">
+        
     </span>
 </div>
 
@@ -184,7 +205,7 @@
     const tagColorPicker = document.getElementById('tag-color-picker');
     const panelSelect = document.getElementById('panel-select');
 
-    let panels = {};  // { panelId: { name, originX, originY, scale, tags: [{html, left, top, width, height, color}] } }
+    let panels = {};  
     let currentPanelId = null;
 
     let scale = 1;
@@ -207,7 +228,7 @@
             currentPanelId = lastPanelId;
         } else {
             if (Object.keys(panels).length === 0) {
-                currentPanelId = createPanel('Default Panel');
+                currentPanelId = createPanel('Panel por defecto');
             } else {
                 currentPanelId = Object.keys(panels)[0];
             }
@@ -338,7 +359,7 @@
     // ---- Idea Tag Management ----
     addTagBtn.addEventListener('click', () => {
         if (!currentPanelId) return;
-        const tag = createIdeaTag('New Idea', tagColorPicker.value, originX + 50, originY + 50, 150, 80);
+        const tag = createIdeaTag('Nueva Idea', tagColorPicker.value, originX + 50, originY + 50, 150, 80);
         panZoomArea.appendChild(tag);
         saveCurrentPanel();
     });
@@ -390,16 +411,14 @@
             if (isResizing) {
                 const dx = e.clientX - resizeStartX;
                 const dy = e.clientY - resizeStartY;
-
                 const newWidth = Math.max(50, resizeStartWidth + dx);
                 const newHeight = Math.max(30, resizeStartHeight + dy);
-
                 tag.style.width = newWidth + 'px';
                 tag.style.height = newHeight + 'px';
             }
         });
 
-        // Double-click on text to select all text
+        // Double-click to select text
         textEl.addEventListener('dblclick', () => {
             const range = document.createRange();
             range.selectNodeContents(textEl);
@@ -408,7 +427,7 @@
             sel.addRange(range);
         });
 
-        // Resize handle logic
+        // Resize handle
         const handle = document.createElement('div');
         handle.className = 'resize-handle';
         tag.appendChild(handle);
@@ -425,7 +444,7 @@
             resizeStartHeight = parseFloat(getComputedStyle(tag, null).getPropertyValue('height'));
         });
 
-        // Menu button to show/hide controls
+        // Menu button
         const menuBtn = document.createElement('button');
         menuBtn.className = 'tag-menu-btn';
         menuBtn.textContent = '≡';
@@ -519,14 +538,13 @@
             saveCurrentPanel();
         });
 
-        // Toggle controls with menuBtn
+        // Toggle controls
         let controlsVisible = false;
         menuBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             controlsVisible = !controlsVisible;
             controlsContainer.style.display = controlsVisible ? 'flex' : 'none';
             if (!controlsVisible) {
-                // Hide color picker if it was open
                 colorPickerVisible = false;
                 colorInput.style.display = 'none';
             }
@@ -537,7 +555,7 @@
 
     // ---- Handle Panels ----
     addPanelBtn.addEventListener('click', () => {
-        const panelName = prompt('Enter panel name:','New Panel');
+        const panelName = prompt('Ingrese el nombre del panel:', 'Panel Nuevo');
         if (panelName) {
             const pid = createPanel(panelName);
             updatePanelSelect();
