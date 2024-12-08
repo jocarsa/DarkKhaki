@@ -84,7 +84,6 @@
         box-sizing: border-box;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         cursor: move;
-        font-size: 14px;
         word-wrap: break-word;
         overflow: hidden;
         resize: none;
@@ -113,11 +112,16 @@
         border-top-left-radius: 3px;
     }
 
-    /* Color Control */
-    .color-control {
+    /* Tag Controls */
+    .tag-controls {
         position: absolute;
         top: 5px;
-        right: 60px;
+        right: 5px;
+        display: flex;
+        gap: 5px;
+    }
+
+    .color-control, .delete-tag-btn, .format-btn, .font-size-select {
         background: rgba(255,255,255,0.7);
         border: none;
         cursor: pointer;
@@ -127,14 +131,14 @@
         color: #000;
     }
 
-    .color-control:hover {
+    .color-control:hover, .delete-tag-btn:hover, .format-btn:hover, .font-size-select:hover {
         background: rgba(255,255,255,0.9);
     }
 
     .tag-color-picker {
         position: absolute;
         top: 25px;
-        right: 60px;
+        right: 5px;
         display: none;
         width: 30px;
         height: 30px;
@@ -142,24 +146,6 @@
         border-radius: 3px;
         cursor: pointer;
         padding: 0;
-    }
-
-    /* Delete Button */
-    .delete-tag-btn {
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        background: rgba(255,0,0,0.7);
-        border: none;
-        cursor: pointer;
-        font-size: 12px;
-        padding: 2px 5px;
-        border-radius: 3px;
-        color: #fff;
-    }
-
-    .delete-tag-btn:hover {
-        background: rgba(255,0,0,0.9);
     }
 </style>
 </head>
@@ -173,6 +159,7 @@
     <span style="color:#aaa;">
         Use mouse wheel or pinch-to-zoom. Drag background to pan. Drag corner to resize tags.
         Click Color on a tag to change its color. Click X to delete a tag.
+        Use B, I, U, and font size to format selected text.
     </span>
 </div>
 
@@ -187,7 +174,7 @@
     const tagColorPicker = document.getElementById('tag-color-picker');
     const panelSelect = document.getElementById('panel-select');
 
-    let panels = {};  // { panelId: { name, originX, originY, scale, tags: [{text, left, top, width, height, color}] } }
+    let panels = {};  // { panelId: { name, originX, originY, scale, tags: [{html, left, top, width, height, color}] } }
     let currentPanelId = null;
 
     let scale = 1;
@@ -198,7 +185,6 @@
 
     // ---- Panel Management ----
 
-    // Load panels from localStorage
     function loadPanelsFromLocalStorage() {
         const savedData = localStorage.getItem('darkKhakiPanels');
         if (savedData) {
@@ -207,28 +193,23 @@
             panels = {};
         }
 
-        // Try to restore last panel
         const lastPanelId = localStorage.getItem('darkKhakiLastPanelId');
         if (lastPanelId && panels[lastPanelId]) {
             currentPanelId = lastPanelId;
         } else {
-            // If no panels exist, create a default one
             if (Object.keys(panels).length === 0) {
                 currentPanelId = createPanel('Default Panel');
             } else {
-                // Just pick the first panel
                 currentPanelId = Object.keys(panels)[0];
             }
         }
     }
 
-    // Save panels to localStorage
     function savePanelsToLocalStorage() {
         localStorage.setItem('darkKhakiPanels', JSON.stringify(panels));
         localStorage.setItem('darkKhakiLastPanelId', currentPanelId);
     }
 
-    // Create a new panel
     function createPanel(name) {
         const panelId = 'panel_' + Date.now();
         panels[panelId] = {
@@ -242,7 +223,6 @@
         return panelId;
     }
 
-    // Update panel select dropdown
     function updatePanelSelect() {
         panelSelect.innerHTML = '';
         for (const pid in panels) {
@@ -256,7 +236,6 @@
         }
     }
 
-    // Load a panel into the UI
     function loadPanel(panelId) {
         currentPanelId = panelId;
         const panel = panels[panelId];
@@ -264,12 +243,10 @@
         originY = panel.originY;
         scale = panel.scale;
         applyTransform();
-        // Clear existing tags
         panZoomArea.innerHTML = '';
-        // Add panel's tags
         panel.tags.forEach(tagData => {
             const tag = createIdeaTag(
-                tagData.text,
+                tagData.html,
                 tagData.color,
                 tagData.left,
                 tagData.top,
@@ -280,7 +257,6 @@
         });
     }
 
-    // Save current panel state from UI
     function saveCurrentPanel() {
         if (!currentPanelId) return;
         const panel = panels[currentPanelId];
@@ -288,12 +264,11 @@
         panel.originY = originY;
         panel.scale = scale;
 
-        // Extract tags from DOM
         const tagElements = panZoomArea.querySelectorAll('.idea-tag');
         panel.tags = Array.from(tagElements).map(tag => {
             const textEl = tag.querySelector('.text-content');
             return {
-                text: textEl ? textEl.textContent : '',
+                html: textEl ? textEl.innerHTML : '',
                 left: parseFloat(tag.style.left),
                 top: parseFloat(tag.style.top),
                 width: parseFloat(tag.style.width),
@@ -329,19 +304,16 @@
         }
     });
 
-    // Zoom with mouse wheel
     document.getElementById('canvas-container').addEventListener('wheel', (e) => {
         e.preventDefault();
         const zoomIntensity = 0.1;
         const direction = e.deltaY > 0 ? -1 : 1;
         const factor = (1 + zoomIntensity * direction);
 
-        // Compute mouse offset relative to the current origin
         const rect = panZoomArea.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        // Adjust origin so zooming is centered at mouse
         originX = mouseX - (mouseX - originX) * factor;
         originY = mouseY - (mouseY - originY) * factor;
 
@@ -362,7 +334,7 @@
         saveCurrentPanel();
     });
 
-    function createIdeaTag(text, bgColor, left, top, width=150, height=80) {
+    function createIdeaTag(html, bgColor, left, top, width=150, height=80) {
         const tag = document.createElement('div');
         tag.className = 'idea-tag';
         tag.style.backgroundColor = bgColor;
@@ -371,23 +343,22 @@
         tag.style.width = width + 'px';
         tag.style.height = height + 'px';
 
-        // Text content element
         const textEl = document.createElement('div');
         textEl.className = 'text-content';
         textEl.contentEditable = "true";
-        textEl.textContent = text;
+        textEl.innerHTML = html;
         tag.appendChild(textEl);
 
-        // Draggable logic
         let isDragging = false;
         let dragStartX, dragStartY;
 
         tag.addEventListener('mousedown', (e) => {
-            // Ignore clicks on controls
             if (e.target.classList.contains('resize-handle') 
              || e.target.classList.contains('color-control') 
              || e.target.classList.contains('tag-color-picker') 
-             || e.target.classList.contains('delete-tag-btn')) return;
+             || e.target.classList.contains('delete-tag-btn')
+             || e.target.classList.contains('format-btn')
+             || e.target.classList.contains('font-size-select')) return;
 
             if (e.target === tag || e.target === textEl) {
                 isDragging = true;
@@ -413,11 +384,9 @@
                 tag.style.top = newY + 'px';
             }
             if (isResizing) {
-                // Calculate new width/height based on mouse movement
                 const dx = e.clientX - resizeStartX;
                 const dy = e.clientY - resizeStartY;
 
-                // Ensure minimum size
                 const newWidth = Math.max(50, resizeStartWidth + dx);
                 const newHeight = Math.max(30, resizeStartHeight + dy);
 
@@ -452,11 +421,16 @@
             resizeStartHeight = parseFloat(getComputedStyle(tag, null).getPropertyValue('height'));
         });
 
-        // Color change logic
+        // Tag Controls (Color, Delete, Format)
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'tag-controls';
+        tag.appendChild(controlsContainer);
+
+        // Color button
         const colorButton = document.createElement('button');
         colorButton.className = 'color-control';
         colorButton.textContent = 'Color';
-        tag.appendChild(colorButton);
+        controlsContainer.appendChild(colorButton);
 
         const colorInput = document.createElement('input');
         colorInput.type = 'color';
@@ -480,10 +454,65 @@
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-tag-btn';
         deleteBtn.textContent = 'X';
-        tag.appendChild(deleteBtn);
+        controlsContainer.appendChild(deleteBtn);
         deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             tag.remove();
+            saveCurrentPanel();
+        });
+
+        // Formatting buttons
+        const boldBtn = document.createElement('button');
+        boldBtn.className = 'format-btn';
+        boldBtn.textContent = 'B';
+        boldBtn.style.fontWeight = 'bold';
+        controlsContainer.appendChild(boldBtn);
+        boldBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            textEl.focus();
+            document.execCommand('bold', false, null);
+            saveCurrentPanel();
+        });
+
+        const italicBtn = document.createElement('button');
+        italicBtn.className = 'format-btn';
+        italicBtn.textContent = 'I';
+        italicBtn.style.fontStyle = 'italic';
+        controlsContainer.appendChild(italicBtn);
+        italicBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            textEl.focus();
+            document.execCommand('italic', false, null);
+            saveCurrentPanel();
+        });
+
+        const underlineBtn = document.createElement('button');
+        underlineBtn.className = 'format-btn';
+        underlineBtn.textContent = 'U';
+        underlineBtn.style.textDecoration = 'underline';
+        controlsContainer.appendChild(underlineBtn);
+        underlineBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            textEl.focus();
+            document.execCommand('underline', false, null);
+            saveCurrentPanel();
+        });
+
+        // Font size selector (values: 1 to 7)
+        const fontSizeSelect = document.createElement('select');
+        fontSizeSelect.className = 'font-size-select';
+        for (let i = 1; i <= 7; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = 'F' + i;
+            fontSizeSelect.appendChild(opt);
+        }
+        controlsContainer.appendChild(fontSizeSelect);
+
+        fontSizeSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            textEl.focus();
+            document.execCommand('fontSize', false, fontSizeSelect.value);
             saveCurrentPanel();
         });
 
@@ -503,17 +532,15 @@
     panelSelect.addEventListener('change', () => {
         const pid = panelSelect.value;
         if (panels[pid]) {
-            saveCurrentPanel(); // save current before switching
+            saveCurrentPanel(); 
             loadPanel(pid);
             updatePanelSelect();
         }
     });
 
-    // Initial load
     loadPanelsFromLocalStorage();
     updatePanelSelect();
     loadPanel(currentPanelId);
-
 </script>
 
 </body>
